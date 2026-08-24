@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SolanaPay — Scan. Pay. Done.</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<!-- Solana web3.js — official library -->
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<style>
+:root{--p:#4F46E5;--g:#16A34A;--o:#F59E0B;--bg:#FFFFFF;--card:#F8F9FA;--border:#D1D5DB;--text:#111827;--muted:#6B7280;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;}
+.bg-fx{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 80% 60% at 10% 10%,rgba(153,69,255,.13) 0%,transparent 55%),
+             radial-gradient(ellipse 60% 50% at 90% 90%,rgba(20,241,149,.09) 0%,transparent 55%);}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:#FFFFFF;
+    backdrop-filter:blur(20px);border-bottom:1px solid rgba(34,34,56,.6);
+    display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:68px;}
+.brand{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,var(--p),var(--g));
+       -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:10px;
+     font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;border:none;
+     text-decoration:none;transition:all .2s;}
+.btn-ghost{background:transparent;border:1px solid rgba(153,69,255,.4);color:var(--p);}
+.btn-ghost:hover{background:rgba(153,69,255,.1);}
+
+/* HERO */
+.hero{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;
+      justify-content:center;padding:120px 24px 60px;}
+.hero-inner{text-align:center;max-width:820px;}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(153,69,255,.1);
+            border:1px solid rgba(153,69,255,.3);color:#c088ff;padding:7px 16px;border-radius:30px;
+            font-size:.8rem;font-weight:700;margin-bottom:28px;animation:fadeUp .6s ease both;}
+.hero h1{font-size:clamp(3rem,8vw,5.5rem);font-weight:800;line-height:1.0;letter-spacing:-2px;
+         animation:fadeUp .7s ease .1s both;}
+.hero h1 span{background:linear-gradient(135deg,var(--p),var(--g));
+              -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hero p{font-size:1.1rem;color:var(--muted);margin:20px auto;max-width:520px;line-height:1.7;
+        animation:fadeUp .7s ease .2s both;}
+
+/* WALLET BOX */
+.wallet-box{background:var(--card);border:1px solid var(--border);border-radius:24px;
+            padding:32px;max-width:440px;margin:28px auto 0;
+            animation:fadeUp .8s ease .3s both;text-align:left;}
+.wallet-box-title{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+                  letter-spacing:1.5px;margin-bottom:18px;text-align:center;}
+.wallet-btn{width:100%;display:flex;align-items:center;gap:14px;background:#FFFFFF
+            border:1px solid var(--border);border-radius:14px;padding:14px 18px;cursor:pointer;
+            transition:all .2s;margin-bottom:10px;font-family:'Syne',sans-serif;color:var(--text);}
+.wallet-btn:last-of-type{margin-bottom:0;}
+.wallet-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.3);}
+.wallet-btn.phantom:hover {border-color:#ab82ff;background:rgba(153,69,255,.08);}
+.wallet-btn.solflare:hover{border-color:#ff9a3c;background:rgba(255,154,60,.08);}
+.wallet-btn.backpack:hover{border-color:#e33e3e;background:rgba(227,62,62,.08);}
+.wallet-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;
+             justify-content:center;font-size:1.4rem;flex-shrink:0;}
+.wi-phantom {background:linear-gradient(135deg,#7b35e0,#ab82ff);}
+.wi-solflare{background:linear-gradient(135deg,#c85a00,#ff9a3c);}
+.wi-backpack{background:linear-gradient(135deg,#8b0000,#e33e3e);}
+.wallet-info{flex:1;}
+.wallet-name{font-size:.95rem;font-weight:700;}
+.wallet-desc{font-size:.72rem;color:var(--muted);margin-top:2px;}
+.wallet-tag{font-size:.65rem;padding:2px 8px;border-radius:20px;font-weight:700;margin-left:auto;flex-shrink:0;}
+.tag-popular {background:rgba(20,241,149,.1);color:var(--g);border:1px solid rgba(20,241,149,.25);}
+.tag-official{background:rgba(255,154,60,.1);color:#ff9a3c;border:1px solid rgba(255,154,60,.25);}
+.tag-new     {background:rgba(227,62,62,.1);color:#e33e3e;border:1px solid rgba(227,62,62,.25);}
+.wallet-nf{font-size:.72rem;color:#ff7070;margin-top:6px;padding:6px 10px;display:none;
+           background:rgba(255,80,80,.06);border:1px solid rgba(255,80,80,.2);border-radius:8px;}
+
+/* DEVNET BADGE */
+.devnet-strip{display:flex;align-items:center;justify-content:center;gap:8px;
+              background:rgba(255,154,60,.08);border:1px solid rgba(255,154,60,.25);
+              border-radius:10px;padding:9px 14px;margin-bottom:18px;font-size:.78rem;color:#ffb870;}
+
+#status{margin-top:14px;padding:12px 16px;border-radius:10px;font-size:.85rem;
+        font-weight:600;display:none;text-align:center;}
+#status.ok {background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.25);color:var(--g);display:block;}
+#status.err{background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.25);color:#ff7070;display:block;}
+#status.ld {background:rgba(153,69,255,.08);border:1px solid rgba(153,69,255,.25);color:#c088ff;display:block;}
+
+/* STEPS */
+.steps-section{position:relative;z-index:1;padding:60px 24px;text-align:center;}
+.sec-eyebrow{font-size:.75rem;font-weight:700;color:var(--p);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
+.sec-title{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;letter-spacing:-1px;margin-bottom:14px;}
+.sec-sub{color:var(--muted);font-size:.95rem;max-width:460px;margin:0 auto 48px;}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:820px;margin:0 auto;}
+@media(max-width:640px){.steps-grid{grid-template-columns:1fr;}}
+.step-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px 20px;text-align:left;transition:border-color .3s;}
+.step-card:hover{border-color:var(--p);}
+.step-num{font-size:2.8rem;font-weight:800;color:var(--border);margin-bottom:12px;line-height:1;}
+.step-icon{font-size:1.8rem;margin-bottom:10px;}
+.step-title{font-size:1rem;font-weight:800;margin-bottom:6px;}
+.step-desc{color:var(--muted);font-size:.84rem;line-height:1.6;}
+
+footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:28px 48px;
+       display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;}
+.footer-brand{font-size:1rem;font-weight:800;background:linear-gradient(135deg,var(--p),var(--g));
+              -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.footer-links{display:flex;gap:18px;}
+.footer-links a{color:var(--muted);text-decoration:none;font-size:.8rem;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="bg-fx"></div>
+
+<nav>
+  <div class="brand">◎ SolanaPay</div>
+  <button class="btn btn-ghost" onclick="document.getElementById('connect-box').scrollIntoView({behavior:'smooth'})">
+    Connect Wallet ↓
+  </button>
+</nav>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">⚡ Powered by Solana Devnet Blockchain</div>
+    <h1>Scan. Pay.<br/><span>Done.</span></h1>
+    <p>Real Solana wallet confirmation — just like a real dApp. Powered by Devnet so it's completely free!</p>
+
+    <!-- WALLET CONNECT BOX -->
+    <div class="wallet-box" id="connect-box">
+
+      <!-- Devnet warning -->
+      <div class="devnet-strip">
+        🌐 Make sure your wallet is on <strong style="margin:0 4px;">Devnet</strong> network!
+      </div>
+
+      <div class="wallet-box-title">🔗 Connect Your Wallet</div>
+
+      <!-- Phantom -->
+      <button class="wallet-btn phantom" onclick="connectPhantom()">
+        <div class="wallet-icon wi-phantom">👻</div>
+        <div class="wallet-info">
+          <div class="wallet-name">Phantom</div>
+          <div class="wallet-desc">Most popular Solana wallet</div>
+        </div>
+        <span class="wallet-tag tag-popular">Popular</span>
+      </button>
+      <div class="wallet-nf" id="phantom-nf">
+        ⚠️ Phantom not installed. <a href="https://phantom.app" target="_blank" style="color:#ab82ff;">Install →</a>
+      </div>
+
+      <!-- Solflare -->
+      <button class="wallet-btn solflare" onclick="connectSolflare()">
+        <div class="wallet-icon wi-solflare">🔶</div>
+        <div class="wallet-info">
+          <div class="wallet-name">Solflare</div>
+          <div class="wallet-desc">Official Solana Foundation wallet</div>
+        </div>
+        <span class="wallet-tag tag-official">Official</span>
+      </button>
+      <div class="wallet-nf" id="solflare-nf">
+        ⚠️ Solflare not installed. <a href="https://solflare.com" target="_blank" style="color:#ff9a3c;">Install →</a>
+      </div>
+
+      <!-- Backpack -->
+      <button class="wallet-btn backpack" onclick="connectBackpack()">
+        <div class="wallet-icon wi-backpack">🎒</div>
+        <div class="wallet-info">
+          <div class="wallet-name">Backpack</div>
+          <div class="wallet-desc">Next-gen multi-chain wallet</div>
+        </div>
+        <span class="wallet-tag tag-new">New</span>
+      </button>
+      <div class="wallet-nf" id="backpack-nf">
+        ⚠️ Backpack not installed. <a href="https://backpack.app" target="_blank" style="color:#e33e3e;">Install →</a>
+      </div>
+
+      <div id="status"></div>
+
+      <div style="text-align:center;margin-top:16px;font-size:.72rem;color:var(--muted);">
+        🔒 We never store your private keys. Your wallet stays in your control.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="steps-section">
+  <div class="sec-eyebrow">Simple 3-step process</div>
+  <h2 class="sec-title">How It Works</h2>
+  <p class="sec-sub">Real Solana wallet confirmations — just like a professional dApp</p>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-num">01</div><div class="step-icon">🔗</div>
+      <div class="step-title">Connect Real Wallet</div>
+      <div class="step-desc">Connect Phantom or Solflare on Devnet — real wallet, free test SOL.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">02</div><div class="step-icon">📷</div>
+      <div class="step-title">Scan QR Code</div>
+      <div class="step-desc">Scan the merchant's QR — payment details loaded automatically.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">03</div><div class="step-icon">✅</div>
+      <div class="step-title">Approve in Wallet</div>
+      <div class="step-desc">Real Phantom popup asks you to approve — just like a real dApp!</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-brand">◎ SolanaPay</div>
+  <div style="color:var(--muted);font-size:.78rem;">© 2025 SolanaPay. All rights reserved.</div>
+  <div class="footer-links"><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Contact</a></div>
+</footer>
+
+<script>
+// ── Solana connection to Devnet ───────────────
+const connection = new solanaWeb3.Connection(
+  solanaWeb3.clusterApiUrl('devnet'), 'confirmed'
+);
+
+function showStatus(msg, type){
+  const el=document.getElementById("status");
+  el.textContent=msg; el.className=type;
+}
+
+async function registerWithBackend(address, walletType){
+  showStatus("⏳ Connecting to SolanaPay...","ld");
+  try{
+    const res=await fetch("/api/connect-wallet",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({address, wallet_type: walletType})});
+    const d=await res.json();
+    if(d.success){
+      showStatus(d.message+" Redirecting...","ok");
+      setTimeout(()=>window.location.href="/dashboard",1000);
+    } else showStatus(d.message,"err");
+  }catch(e){ showStatus("❌ Server error. Is Flask running?","err"); }
+}
+
+// ── PHANTOM ──────────────────────────────────
+async function connectPhantom(){
+  const p=window.phantom?.solana||window.solana;
+  if(!p||!p.isPhantom){
+    document.getElementById("phantom-nf").style.display="block"; return;
+  }
+  try{
+    showStatus("⏳ Opening Phantom wallet...","ld");
+    const resp = await p.connect();
+    const address = resp.publicKey.toString();
+    await registerWithBackend(address, "Phantom");
+  }catch(err){
+    showStatus(err.code===4001?"❌ Connection rejected.":"❌ "+err.message,"err");
+  }
+}
+
+// ── SOLFLARE ─────────────────────────────────
+async function connectSolflare(){
+  const sf=window.solflare;
+  if(!sf||!sf.isSolflare){
+    document.getElementById("solflare-nf").style.display="block"; return;
+  }
+  try{
+    showStatus("⏳ Opening Solflare wallet...","ld");
+    await sf.connect();
+    const address = sf.publicKey.toString();
+    await registerWithBackend(address, "Solflare");
+  }catch(err){
+    showStatus("❌ "+err.message,"err");
+  }
+}
+
+// ── BACKPACK ─────────────────────────────────
+async function connectBackpack(){
+  const bp=window.backpack||window.xnft;
+  if(!bp){
+    document.getElementById("backpack-nf").style.display="block"; return;
+  }
+  try{
+    showStatus("⏳ Opening Backpack...","ld");
+    await bp.connect();
+    await registerWithBackend(bp.publicKey.toString(), "Backpack");
+  }catch(err){
+    showStatus("❌ "+err.message,"err");
+  }
+}
+
+// Auto reconnect
+window.addEventListener("load", async()=>{
+  const p=window.phantom?.solana||window.solana;
+  if(p?.isConnected&&p?.publicKey)
+    await registerWithBackend(p.publicKey.toString(), "Phantom");
+});
+</script>
+</body>
+</html>

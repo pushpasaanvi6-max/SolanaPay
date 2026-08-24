@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Pay {{ qr.merchant_name }}{% endblock %}
+
+{% block head %}
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<style>
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.2);
+  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.step-row{display:flex;align-items:center;gap:8px;font-size:.8rem;padding:8px 12px;
+  border-radius:8px;margin-top:8px;}
+.step-active{background:rgba(153,69,255,.08);color:#c088ff;border:1px solid rgba(153,69,255,.2);}
+.step-done  {background:rgba(20,241,149,.08);color:var(--g);border:1px solid rgba(20,241,149,.2);}
+.step-err   {background:rgba(255,80,80,.08);color:#ff7070;border:1px solid rgba(255,80,80,.2);}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap-sm">
+  <div class="card" style="text-align:center;padding:36px 28px;">
+
+    {% if qr.status == 'paid' %}
+    <div style="font-size:3rem;margin-bottom:16px;">✅</div>
+    <h2 style="font-size:1.5rem;font-weight:800;color:var(--g);margin-bottom:8px;">Payment Complete!</h2>
+    <p style="color:var(--muted);font-size:.9rem;">This QR has already been paid.</p>
+    <a href="/dashboard" class="btn btn-ghost" style="margin-top:24px;display:inline-block;">← Dashboard</a>
+
+    {% else %}
+    <div style="font-size:2.8rem;margin-bottom:8px;">🛒</div>
+    <div style="font-size:1rem;font-weight:700;color:var(--muted);margin-bottom:4px;">{{ qr.merchant_name }}</div>
+    <div style="font-size:3rem;font-weight:800;letter-spacing:-2px;
+                background:linear-gradient(135deg,var(--p),var(--g));
+                -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1;">
+      {{ qr.amount }} SOL
+    </div>
+    <div style="color:var(--muted);font-size:.9rem;margin-top:6px;margin-bottom:24px;">{{ qr.label }}</div>
+
+    <!-- Devnet badge -->
+    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,154,60,.08);
+         border:1px solid rgba(255,154,60,.25);border-radius:20px;
+         padding:4px 12px;font-size:.72rem;color:#ffb870;font-weight:700;margin-bottom:20px;">
+      🌐 Devnet — Real wallet confirmation
+    </div>
+
+    {% if logged_in %}
+    <!-- Wallet info -->
+    <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:12px;
+                padding:14px 16px;margin-bottom:16px;text-align:left;">
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:4px;font-weight:700;
+                  text-transform:uppercase;letter-spacing:1px;">Paying from</div>
+      <div class="mono" style="font-size:.72rem;color:var(--g);">{{ payer_addr }}</div>
+      <div style="font-size:.8rem;color:var(--muted);margin-top:4px;">
+        App Balance: <strong style="color:var(--text)">{{ payer_balance }} SOL</strong>
+      </div>
+    </div>
+
+    <div style="background:rgba(153,69,255,.06);border:1px solid rgba(153,69,255,.2);
+                border-radius:10px;padding:10px 14px;margin-bottom:16px;
+                font-size:.78rem;color:#c088ff;text-align:left;">
+      🦊 Your <strong>Phantom / Solflare</strong> wallet will open for approval!
+    </div>
+
+    <!-- Step indicators -->
+    <div id="step1" class="step-row step-active" style="display:none;text-align:left;">
+      <span class="spinner"></span> Building transaction on Devnet...
+    </div>
+    <div id="step2" class="step-row step-active" style="display:none;text-align:left;">
+      <span class="spinner"></span> Waiting for wallet approval...
+    </div>
+    <div id="step-done" class="step-row step-done" style="display:none;text-align:left;"></div>
+    <div id="step-err"  class="step-row step-err"  style="display:none;text-align:left;"></div>
+
+    <button id="pay-btn" class="btn btn-green btn-full"
+            style="font-size:1rem;padding:16px;margin-top:14px;"
+            onclick="payWithRealWallet()">
+      🦊 Approve in Wallet · {{ qr.amount }} SOL
+    </button>
+
+    {% else %}
+    <!-- Not connected -->
+    <div style="background:rgba(153,69,255,.08);border:1px solid rgba(153,69,255,.25);
+                border-radius:14px;padding:20px;margin-bottom:20px;">
+      <div style="font-size:.9rem;color:var(--muted);margin-bottom:14px;">
+        Connect your wallet to pay
+      </div>
+      <button class="btn btn-primary btn-full" onclick="connectAndPay()">
+        🟣 Connect Wallet to Pay
+      </button>
+    </div>
+    <div id="step-err" class="step-row step-err" style="display:none;text-align:left;"></div>
+    {% endif %}
+
+    {% endif %}
+  </div>
+
+  <div style="text-align:center;margin-top:12px;">
+    <a href="/" style="color:var(--muted);font-size:.8rem;text-decoration:none;">◎ Powered by SolanaPay</a>
+  </div>
+</div>
+
+<script>
+const solanaConn = new solanaWeb3.Connection(
+  solanaWeb3.clusterApiUrl('devnet'), 'confirmed'
+);
+const QR_ID       = "{{ qr_id }}";
+const MERCHANT    = "{{ qr.merchant_address }}";
+const AMOUNT_SOL  = {{ qr.amount }};
+const PAYER_ADDR  = "{{ payer_addr }}";
+
+function showStep(id){ document.getElementById(id).style.display="flex"; }
+function hideStep(id){ document.getElementById(id).style.display="none"; }
+
+async function payWithRealWallet(){
+  const btn = document.getElementById("pay-btn");
+  btn.disabled=true;
+  btn.innerHTML=`<span class="spinner"></span> Processing...`;
+
+  // Reset steps
+  ["step1","step2","step-done","step-err"].forEach(id=>hideStep(id));
+
+  try {
+    // ── Step 1: Build transaction ──────────────────────
+    showStep("step1");
+    const lamports      = Math.round(AMOUNT_SOL * solanaWeb3.LAMPORTS_PER_SOL);
+    const payerPubKey   = new solanaWeb3.PublicKey(PAYER_ADDR);
+    const merchantPubKey= new solanaWeb3.PublicKey(MERCHANT);
+
+    const transaction = new solanaWeb3.Transaction().add(
+      solanaWeb3.SystemProgram.transfer({
+        fromPubkey: payerPubKey,
+        toPubkey:   merchantPubKey,
+        lamports:   lamports
+      })
+    );
+    const { blockhash } = await solanaConn.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = payerPubKey;
+    hideStep("step1");
+
+    // ── Step 2: Real wallet popup! ─────────────────────
+    showStep("step2");
+    const provider = window.phantom?.solana || window.solflare || window.solana;
+    if(!provider) throw new Error("No wallet connected!");
+
+    // THIS opens real Phantom/Solflare popup ↓
+    const { signature } = await provider.signAndSendTransaction(transaction);
+    hideStep("step2");
+
+    // ── Confirmed on Devnet! ───────────────────────────
+    document.getElementById("step-done").style.display="flex";
+    document.getElementById("step-done").textContent =
+      `✅ Paid on Devnet! TX: ${signature.slice(0,20)}...`;
+    btn.textContent="✅ Payment Approved!";
+    btn.style.background="linear-gradient(135deg,#0fbc75,#14F195)";
+
+    // Also record internally on our blockchain
+    const res = await fetch("/api/pay-qr", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ qr_id: QR_ID, tx_hash: signature })
+    });
+    const d = await res.json();
+
+    setTimeout(()=> window.location.href="/dashboard", 2000);
+
+  } catch(err){
+    hideStep("step1"); hideStep("step2");
+    const errEl=document.getElementById("step-err");
+    errEl.style.display="flex";
+    if(err.code===4001||err.message.includes("rejected")){
+      errEl.textContent="❌ Payment rejected by user in wallet.";
+    } else if(err.message.includes("insufficient")){
+      errEl.textContent="❌ Insufficient SOL in Devnet wallet. Please airdrop SOL first!";
+    } else {
+      errEl.textContent="❌ "+err.message;
+    }
+    btn.disabled=false;
+    btn.innerHTML="🦊 Approve in Wallet · "+AMOUNT_SOL+" SOL";
+  }
+}
+
+async function connectAndPay(){
+  const p=window.phantom?.solana||window.solana;
+  if(!p||!p.isPhantom){
+    document.getElementById("step-err").style.display="flex";
+    document.getElementById("step-err").textContent="⚠️ Phantom not installed! Visit phantom.app";
+    return;
+  }
+  try{
+    await p.connect();
+    const res=await fetch("/api/connect-wallet",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({address:p.publicKey.toString()})});
+    const d=await res.json();
+    if(d.success) window.location.reload();
+  }catch(err){
+    document.getElementById("step-err").style.display="flex";
+    document.getElementById("step-err").textContent="❌ "+err.message;
+  }
+}
+</script>
+{% endblock %}

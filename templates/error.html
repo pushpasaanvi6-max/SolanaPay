@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Error{% endblock %}
+{% block content %}
+<div class="wrap-sm" style="text-align:center;padding-top:80px;">
+  <div class="empty">
+    <div class="emoji">❌</div>
+    <div style="font-size:1.2rem;font-weight:800;margin-bottom:8px;">Something went wrong</div>
+    <div style="color:var(--muted);margin-bottom:24px;">{{ msg }}</div>
+    <a href="/dashboard" class="btn btn-ghost">← Go Home</a>
+  </div>
+</div>
+{% endblock %}

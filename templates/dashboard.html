@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block head %}
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<style>
+  .live-dot{display:inline-block;width:7px;height:7px;background:var(--g);border-radius:50%;margin-right:5px;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .shimmer{background:linear-gradient(90deg,#1a1a2a 25%,#22223a 50%,#1a1a2a 75%);
+    background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:20px;width:100px;display:inline-block;}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .change-up  {background:rgba(20,241,149,.1);color:var(--g);border:1px solid rgba(20,241,149,.25);}
+  .change-down{background:rgba(255,80,80,.1);color:#ff7070;border:1px solid rgba(255,80,80,.25);}
+  .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;
+    border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Balance Card -->
+  <div class="card" style="background:linear-gradient(135deg,rgba(153,69,255,.1),rgba(20,241,149,.05));border-color:rgba(153,69,255,.3);">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">
+        🟣 {{ wallet_type }} Wallet
+      </span>
+      <span style="display:inline-flex;align-items:center;background:rgba(255,154,60,.08);
+            border:1px solid rgba(255,154,60,.25);border-radius:20px;padding:3px 10px;
+            font-size:.7rem;color:#ffb870;font-weight:700;">
+        🌐 Devnet
+      </span>
+      <span id="live-badge" style="display:none;align-items:center;">
+        <span class="live-dot"></span>
+        <span style="font-size:.7rem;color:var(--g);font-weight:600;">LIVE PRICE</span>
+      </span>
+    </div>
+
+    <!-- SOL + USD + INR inline — balance fetched from REAL Devnet -->
+    <div style="display:flex;align-items:flex-end;flex-wrap:wrap;gap:16px;">
+
+      <!-- Real Devnet SOL balance -->
+      <div>
+        <div style="font-size:.7rem;color:var(--muted);font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">
+          Real Devnet Balance
+        </div>
+        <div id="sol-balance" style="font-size:3.2rem;font-weight:800;letter-spacing:-2px;
+                    background:linear-gradient(135deg,var(--p),var(--g));
+                    -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;">
+          <span class="shimmer" style="height:52px;width:180px;border-radius:8px;"></span>
+        </div>
+      </div>
+
+      <!-- USD + INR -->
+      <div style="display:flex;flex-direction:column;gap:6px;padding-bottom:4px;">
+        <div style="display:flex;align-items:center;gap:7px;background:#FFFFFF;
+                    border:1px solid rgba(46,204,113,.25);border-radius:10px;padding:7px 14px;">
+          <span style="font-size:.8rem;">🇺🇸</span>
+          <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">USD</span>
+          <span id="val-usd" style="font-size:1.05rem;font-weight:800;color:#2ecc71;">
+            <span class="shimmer"></span>
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;background:#FFFFFF;
+                    border:1px solid rgba(243,156,18,.25);border-radius:10px;padding:7px 14px;">
+          <span style="font-size:.8rem;">🇮🇳</span>
+          <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">INR</span>
+          <span id="val-inr" style="font-size:1.05rem;font-weight:800;color:#f39c12;">
+            <span class="shimmer"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rate bar -->
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 14px;
+                background:#FFFFFF;border:1px solid var(--border);border-radius:10px;font-size:.78rem;color:var(--muted);flex-wrap:wrap;">
+      <span>1 SOL =</span>
+      <span id="rate-usd"><span class="shimmer" style="width:60px;height:14px;"></span></span>
+      <span style="color:var(--border)">|</span>
+      <span id="rate-inr"><span class="shimmer" style="width:70px;height:14px;"></span></span>
+      <span id="change-24h"></span>
+    </div>
+
+    <!-- Wallet address -->
+    <div class="mono" style="font-size:.7rem;color:var(--muted);background:#FFFFFF;
+         border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-top:14px;word-break:break-all;">
+      📬 {{ address }}
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+      <a href="/create-qr" class="btn btn-primary">📷 Create QR</a>
+      <a href="/send"      class="btn btn-green">📤 Send SOL</a>
+      <button onclick="airdropSOL()"    class="btn btn-ghost" id="airdrop-btn">🪂 Airdrop SOL</button>
+      <button onclick="refreshBalance()" class="btn btn-ghost">🔄 Refresh</button>
+      <a href="/explorer"  class="btn btn-ghost">🔗 Explorer</a>
+    </div>
+
+    <div id="airdrop-status" style="display:none;margin-top:10px;font-size:.8rem;"></div>
+  </div>
+
+  <!-- Transactions -->
+  <div class="card" style="margin-top:16px;">
+    <div class="sec-label">Recent Transactions</div>
+    {% if history %}
+    <ul class="tx-list">
+      {% for tx in history %}
+      <li class="tx-item">
+        <div class="tx-icon {{ 'out' if tx.type=='sent' else 'in' }}">
+          {{ '📤' if tx.type=='sent' else '📥' }}
+        </div>
+        <div class="tx-info">
+          <div class="tx-name">
+            {% if tx.type=='sent' %}→ {{ tx.other }}{% else %}← {{ tx.other }}{% endif %}
+            {% if tx.is_qr %}<span class="badge badge-qr" style="margin-left:6px;">QR</span>{% endif %}
+          </div>
+          <div class="tx-sub">{{ tx.label }} · {{ tx.tx_id }}</div>
+          <div class="tx-sub">{{ tx.time }}</div>
+        </div>
+        <div class="tx-amt {{ 'out' if tx.type=='sent' else 'in' }}">
+          {{ '-' if tx.type=='sent' else '+' }}{{ tx.amount }} SOL
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty">
+      <div class="emoji">🌱</div>
+      No transactions yet.<br/>Create a QR or send SOL to get started!
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+const USER_ADDR  = "{{ address }}";
+const solanaConn = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
+
+let realBalanceSOL = 0; // will be updated from Devnet
+
+// ── FETCH REAL DEVNET BALANCE ─────────────────────
+async function fetchRealBalance() {
+  try {
+    const pubkey   = new solanaWeb3.PublicKey(USER_ADDR);
+    const lamports = await solanaConn.getBalance(pubkey);
+    realBalanceSOL = lamports / solanaWeb3.LAMPORTS_PER_SOL;
+
+    // Update balance display
+    document.getElementById('sol-balance').innerHTML =
+      `${realBalanceSOL.toFixed(4)}<span style="font-size:1.4rem"> SOL</span>`;
+
+    // Now update USD/INR with real balance
+    updateConversions();
+
+  } catch(e) {
+    document.getElementById('sol-balance').innerHTML =
+      `<span style="font-size:1rem;color:#ff7070;">⚠️ Could not fetch balance<br/>
+       <span style="font-size:.78rem;color:var(--muted)">Make sure Phantom is on Devnet</span></span>`;
+  }
+}
+
+// ── LIVE PRICE + CONVERSION ───────────────────────
+async function fetchPrice() {
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd,inr&include_24hr_change=true'
+    );
+    const d   = await res.json();
+    const usd = d.solana.usd;
+    const inr = d.solana.inr;
+    const ch  = d.solana.usd_24h_change || 0;
+
+    // Store for use when balance loads
+    window._solPrice = { usd, inr, ch };
+
+    document.getElementById('rate-usd').innerHTML =
+      `<span style="color:#2ecc71;font-weight:700;">$${usd.toFixed(2)}</span>`;
+    document.getElementById('rate-inr').innerHTML =
+      `<span style="color:#f39c12;font-weight:700;">₹${inr.toFixed(0)}</span>`;
+
+    const up = ch >= 0;
+    document.getElementById('change-24h').innerHTML =
+      `<span style="padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;
+       background:${up?'rgba(20,241,149,.1)':'rgba(255,80,80,.1)'};
+       color:${up?'#14F195':'#ff7070'};
+       border:1px solid ${up?'rgba(20,241,149,.25)':'rgba(255,80,80,.25)'}">
+       ${up?'▲':'▼'} ${Math.abs(ch).toFixed(2)}% 24h</span>`;
+
+    document.getElementById('live-badge').style.display = 'inline-flex';
+    updateConversions();
+
+  } catch(e) {
+    // Fallback prices
+    window._solPrice = { usd: 93.5, inr: 8100, ch: 0 };
+    document.getElementById('rate-usd').textContent = '~$93.50';
+    document.getElementById('rate-inr').textContent = '~₹8,100';
+    updateConversions();
+  }
+}
+
+function updateConversions() {
+  if (!window._solPrice || realBalanceSOL === 0) return;
+  const { usd, inr } = window._solPrice;
+  document.getElementById('val-usd').textContent =
+    '$' + (realBalanceSOL * usd).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('val-inr').textContent =
+    '₹' + (realBalanceSOL * inr).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// ── AIRDROP ───────────────────────────────────────
+async function airdropSOL() {
+  const btn    = document.getElementById('airdrop-btn');
+  const status = document.getElementById('airdrop-status');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Requesting...`;
+  status.style.display = 'block';
+  status.style.color   = '#c088ff';
+  status.textContent   = '⏳ Requesting 1 SOL from Devnet faucet...';
+  try {
+    const pubkey = new solanaWeb3.PublicKey(USER_ADDR);
+    const sig    = await solanaConn.requestAirdrop(pubkey, solanaWeb3.LAMPORTS_PER_SOL);
+    await solanaConn.confirmTransaction(sig);
+    status.style.color   = '#14F195';
+    status.textContent   = '✅ 1 SOL airdropped! Refreshing balance...';
+    setTimeout(()=>{ fetchRealBalance(); }, 2000);
+  } catch(e) {
+    status.style.color = '#ff7070';
+    status.textContent = '❌ Airdrop failed! Try: https://faucet.solana.com';
+  }
+  btn.innerHTML = '🪂 Airdrop SOL';
+  btn.disabled  = false;
+}
+
+// ── REFRESH BALANCE BUTTON ────────────────────────
+function refreshBalance() {
+  document.getElementById('sol-balance').innerHTML =
+    `<span class="shimmer" style="height:52px;width:180px;border-radius:8px;"></span>`;
+  fetchRealBalance();
+}
+
+// Load everything on page start
+fetchRealBalance();
+fetchPrice();
+
+// Auto-refresh every 30 seconds
+setInterval(fetchRealBalance, 30000);
+setInterval(fetchPrice,       60000);
+</script>
+{% endblock %}
