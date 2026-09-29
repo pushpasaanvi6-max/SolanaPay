@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Blockchain Explorer{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+      <h2 style="font-size:1.3rem;font-weight:800;">🔗 Blockchain Explorer</h2>
+      <span class="badge {{ 'badge-ok' if is_valid else 'badge-err' }}">
+        {{ '✅ Chain Valid' if is_valid else '❌ Tampered!' }}
+      </span>
+    </div>
+
+    <div class="g3" style="margin-bottom:28px;">
+      <div><div class="stat-label">Total Blocks</div><div class="stat-val">{{ blocks|length }}</div></div>
+      <div><div class="stat-label">Network</div><div class="stat-val" style="color:var(--p);font-size:1rem;">SolPay Simnet</div></div>
+      <div><div class="stat-label">Difficulty</div><div class="stat-val">2</div></div>
+    </div>
+
+    <div class="sec-label">All Blocks — Newest First</div>
+
+    {% for block in blocks|reverse %}
+    <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px;">
+      <div style="font-weight:800;color:var(--p);margin-bottom:10px;">
+        {{ '🌟 Genesis Block' if block.index == 0 else '⬡ Block #' + block.index|string }}
+      </div>
+      <div class="mono" style="font-size:.72rem;color:var(--muted);line-height:2;">
+        <div><span style="color:var(--text)">Hash:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+          <span style="color:var(--g)">{{ block.hash }}</span></div>
+        <div><span style="color:var(--text)">Prev Hash:</span>
+          <span>{{ block.previous_hash[:48] }}...</span></div>
+        <div><span style="color:var(--text)">Nonce:&nbsp;&nbsp;&nbsp;</span>{{ block.nonce }}</div>
+      </div>
+      {% for tx in block.transactions %}
+        {% if tx.type in ('transfer','qr_payment') %}
+        <div style="margin-top:10px;padding:10px 12px;background:#F8F9FA;border:1px solid var(--border);border-radius:10px;
+                    border-left:3px solid var(--p);font-family:'DM Mono',monospace;font-size:.72rem;line-height:1.8;">
+          {{ '📷 QR' if tx.type=='qr_payment' else '📤' }}
+          <span style="color:var(--text)">{{ tx.sender[:8] }}...{{ tx.sender[-4:] }}</span>
+          → <span style="color:var(--text)">{{ tx.receiver[:8] }}...{{ tx.receiver[-4:] }}</span>
+          &nbsp;<span style="color:var(--g)">{{ tx.amount }} SOL</span>
+          {% if tx.get('label') %}&nbsp;<span style="color:var(--muted)">· {{ tx.label }}</span>{% endif %}
+          &nbsp;<span style="color:#111827;">{{ tx.tx_id }}</span>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
